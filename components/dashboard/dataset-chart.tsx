@@ -3,46 +3,31 @@
 import { useEffect, useState } from "react"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
-// Mock data for the chart
-const mockData = [
-  {
-    name: "Jan",
-    downloads: 120,
-    revenue: 240,
-  },
-  {
-    name: "Feb",
-    downloads: 170,
-    revenue: 320,
-  },
-  {
-    name: "Mar",
-    downloads: 210,
-    revenue: 380,
-  },
-  {
-    name: "Apr",
-    downloads: 190,
-    revenue: 350,
-  },
-  {
-    name: "May",
-    downloads: 230,
-    revenue: 410,
-  },
-  {
-    name: "Jun",
-    downloads: 290,
-    revenue: 520,
-  },
-]
+export interface MonthlyData {
+  name: string
+  downloads: number
+  revenue: number
+}
 
-export function DatasetChart() {
+interface DatasetChartProps {
+  data: MonthlyData[]
+}
+
+export function DatasetChart({ data = [] }: DatasetChartProps) {
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // If no data is provided, use empty placeholder data
+  const chartData = data.length > 0
+    ? data
+    : Array(12).fill(0).map((_, i) => ({
+        name: new Date(0, i).toLocaleString('default', { month: 'short' }),
+        downloads: 0,
+        revenue: 0
+      }))
 
   if (!isMounted) {
     return (
@@ -54,7 +39,7 @@ export function DatasetChart() {
 
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={mockData}>
+      <BarChart data={chartData}>
         <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
         <YAxis
           stroke="#888888"

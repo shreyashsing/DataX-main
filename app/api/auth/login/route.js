@@ -27,12 +27,16 @@ export async function POST(request) {
       );
     }
     
+    console.log('Login successful for user ID:', user._id);
+    
     // Generate a JWT token
     const token = sign(
-      { userId: user._id, email: user.email },
+      { userId: user._id.toString(), email: user.email },
       process.env.JWT_SECRET || 'asdfghjkl',
       { expiresIn: '7d' }
     );
+    
+    console.log('Generated token with userId:', user._id.toString());
     
     // Return the user and token
     return NextResponse.json({ user, token });

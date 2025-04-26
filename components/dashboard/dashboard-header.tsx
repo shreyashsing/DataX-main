@@ -4,7 +4,8 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { UserNav } from "@/components/user-nav"
 import { Button } from "@/components/ui/button"
 import { Bell, Upload } from "lucide-react"
-import { Web3WalletConnector } from "@/components/dashboard/web3-wallet-connector"
+import { WalletConnector } from "@/components/wallet/wallet-connector"
+import { WalletProvider } from "@/components/wallet/wallet-provider"
 import Link from "next/link"
 
 interface DashboardHeaderProps {
@@ -31,7 +32,9 @@ export function DashboardHeader({ title, description }: DashboardHeaderProps) {
               Publish Dataset
             </Link>
           </Button>
-          <Web3WalletConnector />
+          <WalletProvider>
+            <WalletConnector />
+          </WalletProvider>
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary"></span>
