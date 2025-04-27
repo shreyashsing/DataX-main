@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { X } from "lucide-react"
 
@@ -46,14 +45,13 @@ const CATEGORIES = [
   "Education",
 ]
 
-const LICENSES = [
-  { value: "CC0", label: "CC0 (Public Domain)" },
-  { value: "CC-BY", label: "CC-BY (Attribution)" },
-  { value: "CC-BY-SA", label: "CC-BY-SA (Attribution-ShareAlike)" },
-  { value: "MIT", label: "MIT License" },
-  { value: "Apache-2.0", label: "Apache License 2.0" },
-  { value: "GPL-3.0", label: "GNU GPL v3" },
-  { value: "Custom", label: "Custom License" },
+const ACCESS_DURATIONS = [
+  { value: "forever", label: "Forever (Permanent Access)" },
+  { value: "1y", label: "1 Year" },
+  { value: "6m", label: "6 Months" },
+  { value: "1m", label: "1 Month" },
+  { value: "1w", label: "1 Week" },
+  { value: "1d", label: "24 Hours" },
 ]
 
 export default function MetadataInput({ formData, updateFormData }: MetadataInputProps) {
@@ -190,45 +188,27 @@ export default function MetadataInput({ formData, updateFormData }: MetadataInpu
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="license" className="text-base">
-            License
+          <Label htmlFor="accessDuration" className="text-base">
+            Access Duration
           </Label>
-          <Select value={formData.license} onValueChange={(value) => updateFormData({ license: value })}>
-            <SelectTrigger id="license">
-              <SelectValue placeholder="Select a license" />
+          <Select 
+            value={formData.accessDuration || "forever"} 
+            onValueChange={(value) => updateFormData({ accessDuration: value })}
+          >
+            <SelectTrigger id="accessDuration">
+              <SelectValue placeholder="Select access duration" />
             </SelectTrigger>
             <SelectContent>
-              {LICENSES.map((license) => (
-                <SelectItem key={license.value} value={license.value}>
-                  {license.label}
+              {ACCESS_DURATIONS.map((duration) => (
+                <SelectItem key={duration.value} value={duration.value}>
+                  {duration.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Choose how others can use your dataset.{" "}
-            <a href="#" className="text-primary hover:underline">
-              Learn more about licenses
-            </a>
+            Define how long buyers will have access to download the dataset again after purchase.
           </p>
-        </div>
-
-        <div className="flex items-center justify-between pt-2">
-          <div className="space-y-0.5">
-            <Label htmlFor="visibility" className="text-base">
-              Dataset Visibility
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              {formData.visibility === "public"
-                ? "Anyone can discover and access your dataset"
-                : "Only you and those you share with can access"}
-            </p>
-          </div>
-          <Switch
-            id="visibility"
-            checked={formData.visibility === "public"}
-            onCheckedChange={(checked) => updateFormData({ visibility: checked ? "public" : "private" })}
-          />
         </div>
       </div>
     </div>

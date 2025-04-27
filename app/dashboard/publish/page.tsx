@@ -11,6 +11,7 @@ import DataQuality from "@/components/dashboard/publish/data-quality"
 import PricingAccess from "@/components/dashboard/publish/pricing-access"
 import PreviewPublish from "@/components/dashboard/publish/preview-publish"
 import { useToast } from "@/hooks/use-toast"
+import { WalletProvider } from "@/components/wallet/wallet-provider"
 
 export type DatasetFormData = {
   file: File | null
@@ -18,8 +19,7 @@ export type DatasetFormData = {
   description: string
   tags: string[]
   category: string
-  license: string
-  visibility: "public" | "private"
+  accessDuration: string
   pricing: {
     model: "free" | "fixed" | "subscription"
     price: string
@@ -33,6 +33,21 @@ export type DatasetFormData = {
   nftMint: boolean
 }
 
+export type VerificationData = {
+  isVerified: boolean
+  datasetHash: string
+  verificationHash: string
+  missingValues: number
+  anomaliesDetected: number
+  biasScore: number
+  piiDetected: boolean
+  overallQuality: number
+  duplicates: number
+  diversity: number
+  datasetCID: string
+  analysisReport: string
+}
+
 export default function PublishDatasetPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -43,8 +58,7 @@ export default function PublishDatasetPage() {
     description: "",
     tags: [],
     category: "",
-    license: "CC0",
-    visibility: "public",
+    accessDuration: "forever",
     pricing: {
       model: "free",
       price: "0",
@@ -57,15 +71,23 @@ export default function PublishDatasetPage() {
     },
     nftMint: true,
   })
+  
+  const [verificationData, setVerificationData] = useState<VerificationData | null>(null)
 
-  // Mock data for AI verification
-  const aiVerification = {
-    missingValues: 2.3,
-    anomaliesDetected: 5,
-    biasScore: 85,
+  // Mock data for AI verification (for backward compatibility)
+  const aiVerification = verificationData ? {
+    missingValues: verificationData.missingValues,
+    anomaliesDetected: verificationData.anomaliesDetected,
+    biasScore: verificationData.biasScore,
+    piiDetected: verificationData.piiDetected,
+    overallQuality: verificationData.overallQuality,
+  } : {
+    missingValues: 0,
+    anomaliesDetected: 0,
+    biasScore: 0,
     piiDetected: false,
-    overallQuality: 92,
-  }
+    overallQuality: 0,
+  };
 
   const steps = ["Upload Dataset", "Metadata", "Data Quality", "Pricing & Access", "Preview & Publish"]
 
@@ -86,6 +108,24 @@ export default function PublishDatasetPage() {
         variant: "destructive",
       })
       return
+    }
+    
+    // Check if verification is completed before proceeding from Data Quality step
+    if (currentStep === 2 && !verificationData) {
+      toast({
+        title: "Verification Required",
+        description: "Please verify your dataset before proceeding.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    // If dataset didn't pass verification, show warning but allow to proceed
+    if (currentStep === 2 && verificationData && !verificationData.isVerified) {
+      toast({
+        title: "Dataset Quality Warning",
+        description: "Your dataset did not pass all quality checks. You can still proceed, but consider addressing the issues.",
+      })
     }
 
     if (currentStep < steps.length - 1) {
@@ -122,6 +162,11 @@ export default function PublishDatasetPage() {
   const updateFormData = (data: Partial<DatasetFormData>) => {
     setFormData((prev) => ({ ...prev, ...data }))
   }
+  
+  // Function to receive verification data from the DataQuality component
+  const updateVerificationData = (data: VerificationData) => {
+    setVerificationData(data)
+  }
 
   return (
     <div className="container mx-auto py-6 max-w-5xl">
@@ -134,12 +179,23 @@ export default function PublishDatasetPage() {
 
         {currentStep === 1 && <MetadataInput formData={formData} updateFormData={updateFormData} />}
 
-        {currentStep === 2 && <DataQuality aiVerification={aiVerification} formData={formData} />}
+        {currentStep === 2 && (
+          <DataQuality 
+            formData={formData} 
+            onVerification={updateVerificationData} 
+          />
+        )}
 
         {currentStep === 3 && <PricingAccess formData={formData} updateFormData={updateFormData} />}
 
         {currentStep === 4 && (
-          <PreviewPublish formData={formData} aiVerification={aiVerification} onPublish={handlePublish} />
+          <WalletProvider>
+            <PreviewPublish 
+              formData={formData} 
+              aiVerification={aiVerification} 
+              onPublish={handlePublish} 
+            />
+          </WalletProvider>
         )}
 
         <div className="flex justify-between mt-8">

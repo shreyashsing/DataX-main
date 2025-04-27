@@ -1,24 +1,43 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type { DatasetFormData } from "@/app/dashboard/publish/page"
+import type { DatasetFormData, VerificationData } from "@/app/dashboard/publish/page"
 import { Card } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { AlertCircle, CheckCircle2, XCircle, AlertTriangle, Shield, BarChart4 } from "lucide-react"
+import { AlertCircle, CheckCircle2, XCircle, AlertTriangle, Shield, BarChart4, Loader2 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
+import { Button } from "@/components/ui/button"
 
-interface DataQualityProps {
-  aiVerification: {
-    missingValues: number
-    anomaliesDetected: number
-    biasScore: number
-    piiDetected: boolean
-    overallQuality: number
-  }
-  formData: DatasetFormData
+interface VerificationResult {
+  missingValues: number
+  anomaliesDetected: number
+  biasScore: number
+  piiDetected: boolean
+  overallQuality: number
+  duplicates: number
+  diversity: number
 }
 
-export default function DataQuality({ aiVerification, formData }: DataQualityProps) {
+interface DataQualityProps {
+  formData: DatasetFormData
+  onVerification?: (data: VerificationData) => void
+}
+
+export default function DataQuality({ formData, onVerification }: DataQualityProps) {
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [verificationComplete, setVerificationComplete] = useState(false)
+  const [verificationError, setVerificationError] = useState<string | null>(null)
+  const [aiVerification, setAiVerification] = useState<VerificationResult>({
+    missingValues: 0,
+    anomaliesDetected: 0,
+    biasScore: 0,
+    piiDetected: false,
+    overallQuality: 0,
+    duplicates: 0,
+    diversity: 0
+  })
+  const [verificationData, setVerificationData] = useState<VerificationData | null>(null)
+
   const [animatedProgress, setAnimatedProgress] = useState({
     missingValues: 0,
     biasScore: 0,
@@ -26,17 +45,92 @@ export default function DataQuality({ aiVerification, formData }: DataQualityPro
   })
 
   useEffect(() => {
-    // Animate progress bars
-    const timer = setTimeout(() => {
-      setAnimatedProgress({
-        missingValues: aiVerification.missingValues,
-        biasScore: aiVerification.biasScore,
-        overallQuality: aiVerification.overallQuality,
-      })
-    }, 300)
+    // If verification is complete, animate progress bars
+    if (verificationComplete) {
+      const timer = setTimeout(() => {
+        setAnimatedProgress({
+          missingValues: aiVerification.missingValues,
+          biasScore: aiVerification.biasScore,
+          overallQuality: aiVerification.overallQuality,
+        })
+      }, 300)
 
-    return () => clearTimeout(timer)
-  }, [aiVerification])
+      return () => clearTimeout(timer)
+    }
+  }, [verificationComplete, aiVerification])
+
+  // When verification data changes, notify parent component
+  useEffect(() => {
+    if (verificationData && onVerification) {
+      onVerification(verificationData)
+    }
+  }, [verificationData, onVerification])
+
+  // Function to handle verification
+  const verifyDataset = async () => {
+    if (!formData.file) {
+      setVerificationError("No dataset file uploaded")
+      return
+    }
+
+    setIsVerifying(true)
+    setVerificationError(null)
+    setVerificationComplete(false)
+
+    try {
+      // Create form data for upload and verification
+      const verifyFormData = new FormData()
+      verifyFormData.append('file', formData.file)
+      verifyFormData.append('name', formData.name)
+      
+      // Call verification API
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        body: verifyFormData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Verification failed')
+      }
+
+      const data = await response.json()
+      
+      // Update state with verification results
+      setAiVerification({
+        missingValues: data.details.missingValues,
+        anomaliesDetected: data.details.anomaliesDetected,
+        biasScore: data.details.biasScore,
+        piiDetected: data.details.piiDetected,
+        overallQuality: data.details.overallQuality,
+        duplicates: data.details.duplicates,
+        diversity: data.details.diversity
+      })
+      
+      // Store complete verification data to pass to parent
+      setVerificationData({
+        isVerified: data.isVerified,
+        datasetHash: data.datasetHash,
+        verificationHash: data.verificationHash,
+        missingValues: data.details.missingValues,
+        anomaliesDetected: data.details.anomaliesDetected,
+        biasScore: data.details.biasScore,
+        piiDetected: data.details.piiDetected,
+        overallQuality: data.details.overallQuality,
+        duplicates: data.details.duplicates,
+        diversity: data.details.diversity,
+        datasetCID: data.details.datasetCID,
+        analysisReport: data.details.analysisReport
+      })
+      
+      setVerificationComplete(true)
+    } catch (error) {
+      console.error("Verification error:", error)
+      setVerificationError(error instanceof Error ? error.message : 'An unknown error occurred')
+    } finally {
+      setIsVerifying(false)
+    }
+  }
 
   // Bias data for pie chart
   const biasData = [
@@ -45,6 +139,60 @@ export default function DataQuality({ aiVerification, formData }: DataQualityPro
   ]
   const COLORS = ["#10b981", "#f43f5e"]
 
+  // If no file is uploaded yet
+  if (!formData.file && !verificationComplete) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Data Quality & AI Verification</h2>
+          <p className="text-muted-foreground mb-6">
+            Upload a dataset in the previous step to get quality metrics.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // If verification hasn't started or is in progress
+  if (!verificationComplete && !isVerifying) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Data Quality & AI Verification</h2>
+          <p className="text-muted-foreground mb-6">
+            Click the button below to analyze your dataset and generate a quality report.
+          </p>
+          {verificationError && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              <p>{verificationError}</p>
+            </div>
+          )}
+          <Button onClick={verifyDataset} className="mt-2">
+            Analyze Dataset
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // If verification is in progress
+  if (isVerifying) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Data Quality & AI Verification</h2>
+          <p className="text-muted-foreground mb-6">
+            Our AI is analyzing your dataset. This might take a moment...
+          </p>
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+            <p className="text-lg">Analyzing dataset quality</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -52,6 +200,22 @@ export default function DataQuality({ aiVerification, formData }: DataQualityPro
         <p className="text-muted-foreground mb-6">
           Our AI has analyzed your dataset and generated the following quality report.
         </p>
+        {verificationData && (
+          <div className={`p-4 border rounded-md mb-4 ${verificationData.isVerified ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+            <div className="flex items-center gap-2">
+              {verificationData.isVerified ? (
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+              )}
+              <p className="font-medium">
+                {verificationData.isVerified 
+                  ? "Dataset verification passed! Your dataset meets quality standards." 
+                  : "Dataset verification flagged some issues. You can still proceed, but consider addressing them for better quality."}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

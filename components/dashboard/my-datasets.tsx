@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Download, Edit, MoreHorizontal, Plus, Search, Star, Trash, Upload, Users } from "lucide-react"
+import { Download, Edit, MoreHorizontal, Plus, Search, Star, Trash, Upload, Users, Clock } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,44 +16,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
+import { useWallet } from "@/components/wallet/wallet-provider"
 
-// Mock data for datasets
-const myDatasets = [
-  {
-    id: "1",
-    title: "Financial Market Trends",
-    description: "Historical financial data covering stock prices, market indices, and economic indicators.",
-    category: "Financial",
-    price: "0.75",
-    downloads: 1800,
-    rating: 4.6,
-    status: "active",
-    createdAt: "2023-02-20T00:00:00Z",
-  },
-  {
-    id: "2",
-    title: "Consumer Behavior Analytics",
-    description: "Detailed consumer behavior data from multiple markets, including purchasing patterns.",
-    category: "Market Research",
-    price: "0.85",
-    downloads: 1200,
-    rating: 4.3,
-    status: "active",
-    createdAt: "2023-03-15T00:00:00Z",
-  },
-  {
-    id: "3",
-    title: "Urban Transportation Flows",
-    description: "Real-time and historical data on urban transportation patterns and traffic density.",
-    category: "Transportation",
-    price: "0.5",
-    downloads: 950,
-    rating: 4.1,
-    status: "draft",
-    createdAt: "2023-04-10T00:00:00Z",
-  },
-]
-
+// Sample purchased datasets as a fallback
 const purchasedDatasets = [
   {
     id: "4",
@@ -79,8 +44,61 @@ const purchasedDatasets = [
   },
 ]
 
+// Add ACCESS_DURATION_LABELS to the file
+const ACCESS_DURATION_LABELS: Record<string, string> = {
+  'forever': 'Forever',
+  '1y': '1 Year',
+  '6m': '6 Months',
+  '1m': '1 Month',
+  '1w': '1 Week',
+  '1d': '24 Hours',
+};
+
 export function MyDatasets() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [myDatasets, setMyDatasets] = useState<any[]>([])
+  const [draftDatasets, setDraftDatasets] = useState<any[]>([])
+  const { walletState } = useWallet()
+
+  // Load datasets from localStorage on component mount
+  useEffect(() => {
+    const loadPublishedDatasets = () => {
+      try {
+        const savedDatasetsJSON = localStorage.getItem('publishedDatasets');
+        const savedDatasets = savedDatasetsJSON ? JSON.parse(savedDatasetsJSON) : [];
+        
+        // Filter by current wallet address if available
+        const filteredDatasets = walletState.address 
+          ? savedDatasets.filter((ds: any) => ds.owner === walletState.address)
+          : savedDatasets;
+          
+        // Process datasets with minimal default values if missing
+        const processedDatasets = filteredDatasets.map((ds: any) => ({
+          ...ds,
+          status: ds.status || "active",
+          createdAt: ds.createdAt || new Date().toISOString(),
+          // Only add rating as a default value if not present
+          rating: ds.rating || (Math.random() * (5 - 3.5) + 3.5).toFixed(1)
+        }));
+        
+        // Separate active and draft datasets
+        setMyDatasets(processedDatasets.filter((ds: any) => ds.status === "active"));
+        setDraftDatasets(processedDatasets.filter((ds: any) => ds.status === "draft"));
+      } catch (error) {
+        console.error("Error loading datasets from localStorage:", error);
+        setMyDatasets([]);
+        setDraftDatasets([]);
+      }
+    };
+
+    loadPublishedDatasets();
+    
+    // Listen for storage events to update datasets when they change
+    window.addEventListener('storage', loadPublishedDatasets);
+    return () => {
+      window.removeEventListener('storage', loadPublishedDatasets);
+    };
+  }, [walletState.address]);
 
   return (
     <div className="space-y-6">
@@ -112,16 +130,29 @@ export function MyDatasets() {
 
         <TabsContent value="my-datasets" className="space-y-4">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {myDatasets
-              .filter((dataset) => dataset.status === "active")
-              .filter(
-                (dataset) =>
-                  dataset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  dataset.description.toLowerCase().includes(searchQuery.toLowerCase()),
-              )
-              .map((dataset) => (
-                <DatasetCard key={dataset.id} dataset={dataset} type="owned" />
-              ))}
+            {myDatasets.length > 0 ? (
+              myDatasets
+                .filter(
+                  (dataset) =>
+                    dataset.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    dataset.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map((dataset) => (
+                  <DatasetCard key={dataset.id || dataset.tokenId} dataset={dataset} type="owned" />
+                ))
+            ) : (
+              <Card className="border-dashed col-span-3 flex flex-col items-center justify-center py-12">
+                <CardContent className="flex flex-col items-center justify-center h-full py-6">
+                  <p className="text-muted-foreground mb-4">No published datasets found</p>
+                  <Button asChild>
+                    <Link href="/dashboard/publish">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Publish Your First Dataset
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="border-dashed flex flex-col items-center justify-center h-[350px]">
               <CardContent className="flex flex-col items-center justify-center h-full py-6">
@@ -149,7 +180,7 @@ export function MyDatasets() {
               .filter(
                 (dataset) =>
                   dataset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  dataset.description.toLowerCase().includes(searchQuery.toLowerCase()),
+                  dataset.description.toLowerCase().includes(searchQuery.toLowerCase())
               )
               .map((dataset) => (
                 <DatasetCard key={dataset.id} dataset={dataset} type="purchased" />
@@ -159,16 +190,23 @@ export function MyDatasets() {
 
         <TabsContent value="drafts" className="space-y-4">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {myDatasets
-              .filter((dataset) => dataset.status === "draft")
-              .filter(
-                (dataset) =>
-                  dataset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  dataset.description.toLowerCase().includes(searchQuery.toLowerCase()),
-              )
-              .map((dataset) => (
-                <DatasetCard key={dataset.id} dataset={dataset} type="owned" />
-              ))}
+            {draftDatasets.length > 0 ? (
+              draftDatasets
+                .filter(
+                  (dataset) =>
+                    dataset.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    dataset.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map((dataset) => (
+                  <DatasetCard key={dataset.id || dataset.tokenId} dataset={dataset} type="owned" />
+                ))
+            ) : (
+              <Card className="border-dashed col-span-3 flex flex-col items-center justify-center py-12">
+                <CardContent className="flex flex-col items-center justify-center h-full py-6">
+                  <p className="text-muted-foreground mb-4">No draft datasets found</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -182,19 +220,35 @@ interface DatasetCardProps {
 }
 
 function DatasetCard({ dataset, type }: DatasetCardProps) {
+  // Determine the price display based on pricing model
+  const getPriceDisplay = () => {
+    if (!dataset.pricing) return "Free";
+    
+    switch (dataset.pricing.model) {
+      case 'free':
+        return "Free";
+      case 'fixed':
+        return `${dataset.pricing.price} ${dataset.pricing.token}`;
+      case 'subscription':
+        return `From ${dataset.pricing.tiers?.basic || '10'} ${dataset.pricing.token}`;
+      default:
+        return dataset.price ? `${dataset.price} ${dataset.pricing?.token || 'OCEAN'}` : "Free";
+    }
+  };
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-            {dataset.category}
+            {dataset.category || "Data"}
           </Badge>
           <div className="flex items-center text-yellow-500">
             <Star className="h-3 w-3 fill-current" />
             <span className="text-xs ml-1">{dataset.rating}</span>
           </div>
         </div>
-        <CardTitle className="text-xl mt-2">{dataset.title}</CardTitle>
+        <CardTitle className="text-xl mt-2">{dataset.title || dataset.name}</CardTitle>
         {type === "purchased" && (
           <p className="text-xs text-muted-foreground">
             By <span className="text-primary">{dataset.owner}</span>
@@ -206,14 +260,14 @@ function DatasetCard({ dataset, type }: DatasetCardProps) {
         <div className="grid grid-cols-3 gap-2 text-center text-sm">
           <div className="bg-muted/30 rounded-md p-2">
             <Download className="h-4 w-4 mx-auto mb-1" />
-            <span className="text-xs text-muted-foreground">{dataset.downloads}</span>
+            <span className="text-xs text-muted-foreground">{dataset.downloads || 0}</span>
           </div>
           <div className="bg-muted/30 rounded-md p-2">
-            <Users className="h-4 w-4 mx-auto mb-1" />
-            <span className="text-xs text-muted-foreground">{Math.floor(dataset.downloads / 15)}</span>
+            <Clock className="h-4 w-4 mx-auto mb-1" />
+            <span className="text-xs text-muted-foreground">{ACCESS_DURATION_LABELS[dataset.accessDuration || 'forever']}</span>
           </div>
           <div className="bg-muted/30 rounded-md p-2">
-            <span className="text-xs font-medium">{dataset.price} OCEAN</span>
+            <span className="text-xs font-medium">{getPriceDisplay()}</span>
           </div>
         </div>
       </CardContent>
