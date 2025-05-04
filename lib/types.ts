@@ -1,5 +1,6 @@
 export interface Dataset {
-    id: string
+    id?: string
+    _id?: string
     name: string
     description: string
     price: number
@@ -15,6 +16,16 @@ export interface Dataset {
     recommended?: boolean
     recommendationReason?: string
     matchScore?: string
+    pricing?: {
+      model: 'free' | 'fixed' | 'subscription'
+      price?: number
+      token?: string
+      tiers?: {
+        basic?: string | number
+        standard?: string | number
+        premium?: string | number
+      }
+    }
   }
   
   

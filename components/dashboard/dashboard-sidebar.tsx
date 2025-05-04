@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth/auth-provider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-import { LayoutDashboard, Database, BarChart, CreditCard, Settings, LogOut, Upload } from "lucide-react"
+import { LayoutDashboard, Database, BarChart, CreditCard, Settings, LogOut, Upload, Wallet } from "lucide-react"
 
 const sidebarItems = [
   {
@@ -29,6 +29,11 @@ const sidebarItems = [
     title: "Transactions",
     href: "/dashboard/transactions",
     icon: <CreditCard className="h-5 w-5" />,
+  },
+  {
+    title: "Token Fix Tool",
+    href: "/token-fix",
+    icon: <Wallet className="h-5 w-5" />,
   },
   {
     title: "Settings",

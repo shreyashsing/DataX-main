@@ -25,25 +25,49 @@ export async function GET(request) {
     const user = await db.collection('users').findOne({ _id: userIdObj });
     console.log('User found in database:', !!user);
     
+    // Build query to match datasets with either owner or ownerId
+    const ownerQuery = {
+      $or: [
+        { owner: userIdObj },
+        { owner: userIdObj.toString() },
+        { ownerId: userIdObj }
+      ]
+    };
+    
     // Check if datasets exist for this user
-    const datasets = await db.collection('datasets').find({ ownerId: userIdObj }).toArray();
+    const datasets = await db.collection('datasets').find(ownerQuery).toArray();
     console.log('Datasets count for user:', datasets.length);
     if (datasets.length > 0) {
       console.log('First dataset:', {
         name: datasets[0].name,
+        owner: datasets[0].owner,
         ownerId: datasets[0].ownerId,
         downloads: datasets[0].downloads
       });
     }
     
     // Check for activities
-    const activities = await db.collection('activities').find({ userId: userIdObj }).toArray();
+    const activitiesQuery = {
+      $or: [
+        { userId: userIdObj },
+        { userId: userIdObj.toString() },
+        { user: userIdObj },
+        { user: userIdObj.toString() }
+      ]
+    };
+    const activities = await db.collection('activities').find(activitiesQuery).toArray();
     console.log('Activities count for user:', activities.length);
     
     // Check for transactions
-    const transactions = await db.collection('transactions').find({
-      $or: [{ userId: userIdObj }, { sellerId: userIdObj }]
-    }).toArray();
+    const transactionsQuery = {
+      $or: [
+        { userId: userIdObj },
+        { userId: userIdObj.toString() },
+        { sellerId: userIdObj },
+        { sellerId: userIdObj.toString() }
+      ]
+    };
+    const transactions = await db.collection('transactions').find(transactionsQuery).toArray();
     console.log('Transactions count for user:', transactions.length);
     
     // Get all stats in parallel

@@ -16,6 +16,24 @@ interface RecommendationCardProps {
 export default function RecommendationCard({ dataset }: RecommendationCardProps) {
   const [isHovered, setIsHovered] = useState(false)
 
+  // Determine the price display based on pricing model
+  const getPriceDisplay = () => {
+    if (!dataset.pricing) {
+      return dataset.price === 0 || dataset.price === undefined ? "Free" : `${dataset.price} ETH`;
+    }
+    
+    switch (dataset.pricing.model) {
+      case 'free':
+        return "Free";
+      case 'fixed':
+        return `${dataset.pricing.price} ${dataset.pricing.token || 'ETH'}`;
+      case 'subscription':
+        return `From ${dataset.pricing.tiers?.basic || '10'} ${dataset.pricing.token || 'ETH'}`;
+      default:
+        return dataset.price ? `${dataset.price} ${dataset.pricing?.token || 'ETH'}` : "Free";
+    }
+  };
+
   // Ensure values are defined to prevent hydration errors
   const recommendationReason = dataset.recommendationReason || "This dataset matches your previous interests and has high quality metrics."
   const matchScore = dataset.matchScore || "98"
@@ -52,8 +70,7 @@ export default function RecommendationCard({ dataset }: RecommendationCardProps)
           <div className="flex justify-between items-start mb-2">
             <h3 className="font-bold text-lg line-clamp-1">{dataset.name}</h3>
             <div className="flex items-center text-primary font-bold">
-              <DollarSign className="h-4 w-4" />
-              <span>{dataset.price}</span>
+              <span>{getPriceDisplay()}</span>
             </div>
           </div>
 
@@ -82,11 +99,17 @@ export default function RecommendationCard({ dataset }: RecommendationCardProps)
         </CardContent>
 
         <CardFooter className="p-4 pt-0">
-          <Link href={`/dataset/${dataset.id}`} className="w-full">
-            <Button size="sm" className="w-full">
+          {(dataset.id || dataset._id) ? (
+            <Link href={`/dataset/${dataset.id || dataset._id}`} className="w-full">
+              <Button size="sm" className="w-full">
+                View Details
+              </Button>
+            </Link>
+          ) : (
+            <Button size="sm" className="w-full" disabled>
               View Details
             </Button>
-          </Link>
+          )}
         </CardFooter>
       </Card>
     </motion.div>

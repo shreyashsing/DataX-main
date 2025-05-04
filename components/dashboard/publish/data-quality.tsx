@@ -9,14 +9,14 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 import { Button } from "@/components/ui/button"
 
 interface VerificationResult {
-  missingValues: number
-  anomaliesDetected: number
-  biasScore: number
-  piiDetected: boolean
-  overallQuality: number
+    missingValues: number
+    anomaliesDetected: number
+    biasScore: number
+    piiDetected: boolean
+    overallQuality: number
   duplicates: number
   diversity: number
-}
+  }
 
 interface DataQualityProps {
   formData: DatasetFormData
@@ -47,15 +47,15 @@ export default function DataQuality({ formData, onVerification }: DataQualityPro
   useEffect(() => {
     // If verification is complete, animate progress bars
     if (verificationComplete) {
-      const timer = setTimeout(() => {
-        setAnimatedProgress({
-          missingValues: aiVerification.missingValues,
-          biasScore: aiVerification.biasScore,
-          overallQuality: aiVerification.overallQuality,
-        })
-      }, 300)
+    const timer = setTimeout(() => {
+      setAnimatedProgress({
+        missingValues: aiVerification.missingValues,
+        biasScore: aiVerification.biasScore,
+        overallQuality: aiVerification.overallQuality,
+      })
+    }, 300)
 
-      return () => clearTimeout(timer)
+    return () => clearTimeout(timer)
     }
   }, [verificationComplete, aiVerification])
 

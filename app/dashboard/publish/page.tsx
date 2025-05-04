@@ -31,6 +31,7 @@ export type DatasetFormData = {
     }
   }
   nftMint: boolean
+  datasetHash?: string // Optional field for the dataset hash
 }
 
 export type VerificationData = {
@@ -71,17 +72,19 @@ export default function PublishDatasetPage() {
     },
     nftMint: true,
   })
-  
+
   const [verificationData, setVerificationData] = useState<VerificationData | null>(null)
 
   // Mock data for AI verification (for backward compatibility)
   const aiVerification = verificationData ? {
+    isVerified: verificationData.isVerified,
     missingValues: verificationData.missingValues,
     anomaliesDetected: verificationData.anomaliesDetected,
     biasScore: verificationData.biasScore,
     piiDetected: verificationData.piiDetected,
     overallQuality: verificationData.overallQuality,
   } : {
+    isVerified: false,
     missingValues: 0,
     anomaliesDetected: 0,
     biasScore: 0,
@@ -89,7 +92,7 @@ export default function PublishDatasetPage() {
     overallQuality: 0,
   };
 
-  const steps = ["Upload Dataset", "Metadata", "Data Quality", "Pricing & Access", "Preview & Publish"]
+  const steps = ["Upload Dataset", "Metadata", "Data Quality", "Pricing & Access", "Preview & Publish"];
 
   const handleNext = () => {
     if (currentStep === 0 && !formData.file) {
@@ -193,7 +196,7 @@ export default function PublishDatasetPage() {
             <PreviewPublish 
               formData={formData} 
               aiVerification={aiVerification} 
-              onPublish={handlePublish} 
+              onPublish={handlePublish}
             />
           </WalletProvider>
         )}

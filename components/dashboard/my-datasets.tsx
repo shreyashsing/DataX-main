@@ -17,6 +17,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { useWallet } from "@/components/wallet/wallet-provider"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth/auth-provider"
+import Cookies from "js-cookie"
 
 // Sample purchased datasets as a fallback
 const purchasedDatasets = [
@@ -58,47 +61,82 @@ export function MyDatasets() {
   const [searchQuery, setSearchQuery] = useState("")
   const [myDatasets, setMyDatasets] = useState<any[]>([])
   const [draftDatasets, setDraftDatasets] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const { walletState } = useWallet()
+  const { user } = useAuth()
+  const { toast } = useToast()
 
-  // Load datasets from localStorage on component mount
+  // Load datasets from database
   useEffect(() => {
-    const loadPublishedDatasets = () => {
+    const fetchDatasets = async () => {
       try {
-        const savedDatasetsJSON = localStorage.getItem('publishedDatasets');
-        const savedDatasets = savedDatasetsJSON ? JSON.parse(savedDatasetsJSON) : [];
-        
-        // Filter by current wallet address if available
-        const filteredDatasets = walletState.address 
-          ? savedDatasets.filter((ds: any) => ds.owner === walletState.address)
-          : savedDatasets;
-          
-        // Process datasets with minimal default values if missing
-        const processedDatasets = filteredDatasets.map((ds: any) => ({
-          ...ds,
-          status: ds.status || "active",
-          createdAt: ds.createdAt || new Date().toISOString(),
-          // Only add rating as a default value if not present
-          rating: ds.rating || (Math.random() * (5 - 3.5) + 3.5).toFixed(1)
-        }));
-        
-        // Separate active and draft datasets
-        setMyDatasets(processedDatasets.filter((ds: any) => ds.status === "active"));
-        setDraftDatasets(processedDatasets.filter((ds: any) => ds.status === "draft"));
-      } catch (error) {
-        console.error("Error loading datasets from localStorage:", error);
+        setIsLoading(true);
+        // Clear any previous datasets first
         setMyDatasets([]);
         setDraftDatasets([]);
+        
+        // Get auth token for authenticated requests
+        const token = Cookies.get("auth-token");
+        if (!token) {
+          console.log("No auth token found, unable to fetch datasets");
+          setIsLoading(false);
+          return;
+        }
+        
+        // Fetch active datasets
+        const activeResponse = await fetch("/api/datasets", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "x-dashboard": "true"
+          }
+        });
+        
+        if (activeResponse.ok) {
+          const activeData = await activeResponse.json();
+          setMyDatasets(activeData.datasets || []);
+        }
+        
+        // Fetch draft datasets
+        const draftResponse = await fetch("/api/datasets/drafts", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "x-dashboard": "true"
+          }
+        });
+        
+        if (draftResponse.ok) {
+          const draftData = await draftResponse.json();
+          setDraftDatasets(draftData.drafts || []);
+        }
+        
+        console.log(`Loaded ${myDatasets.length} active datasets and ${draftDatasets.length} drafts for user: ${user?._id || 'unknown'}`);
+      } catch (error) {
+        console.error("Error fetching datasets:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load your datasets. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    loadPublishedDatasets();
-    
-    // Listen for storage events to update datasets when they change
-    window.addEventListener('storage', loadPublishedDatasets);
-    return () => {
-      window.removeEventListener('storage', loadPublishedDatasets);
-    };
-  }, [walletState.address]);
+    fetchDatasets();
+  }, [user, toast]); // Remove walletState.address dependency
+
+  // Function to clear localStorage (keeping this for development purposes)
+  const clearLocalStorageData = () => {
+    try {
+      localStorage.removeItem('publishedDatasets');
+      toast({
+        title: "Local Data Cleared",
+        description: "All localStorage dataset data has been removed.",
+      });
+    } catch (error) {
+      console.error("Error clearing localStorage:", error);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -113,12 +151,17 @@ export function MyDatasets() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Button asChild>
-          <Link href="/dashboard/publish">
-            <Upload className="mr-2 h-4 w-4" />
-            Publish New Dataset
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild>
+            <Link href="/dashboard/publish">
+              <Upload className="mr-2 h-4 w-4" />
+              Publish New Dataset
+            </Link>
+          </Button>
+          <Button variant="outline" onClick={clearLocalStorageData}>
+            <Trash className="mr-2 h-4 w-4" /> Clear Local Cache
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="my-datasets" className="space-y-4">
@@ -129,49 +172,55 @@ export function MyDatasets() {
         </TabsList>
 
         <TabsContent value="my-datasets" className="space-y-4">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {myDatasets.length > 0 ? (
-              myDatasets
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {myDatasets.length > 0 ? (
+                myDatasets
                 .filter(
                   (dataset) =>
-                    dataset.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    dataset.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                      dataset.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      dataset.description?.toLowerCase().includes(searchQuery.toLowerCase())
                 )
                 .map((dataset) => (
-                  <DatasetCard key={dataset.id || dataset.tokenId} dataset={dataset} type="owned" />
-                ))
-            ) : (
-              <Card className="border-dashed col-span-3 flex flex-col items-center justify-center py-12">
+                    <DatasetCard key={dataset._id} dataset={dataset} type="owned" />
+                  ))
+              ) : (
+                <Card className="border-dashed col-span-3 flex flex-col items-center justify-center py-12">
+                  <CardContent className="flex flex-col items-center justify-center h-full py-6">
+                    <p className="text-muted-foreground mb-4">No published datasets found</p>
+                    <Button asChild>
+                      <Link href="/dashboard/publish">
+                        <Upload className="mr-2 h-4 w-4" />
+                        Publish Your First Dataset
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card className="border-dashed flex flex-col items-center justify-center h-[350px]">
                 <CardContent className="flex flex-col items-center justify-center h-full py-6">
-                  <p className="text-muted-foreground mb-4">No published datasets found</p>
+                  <div className="rounded-full bg-primary/10 p-3 mb-4">
+                    <Plus className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-2">Upload New Dataset</h3>
+                  <p className="text-sm text-muted-foreground text-center mb-4">
+                    Share your data with the community and start earning
+                  </p>
                   <Button asChild>
                     <Link href="/dashboard/publish">
                       <Upload className="mr-2 h-4 w-4" />
-                      Publish Your First Dataset
+                      Upload Dataset
                     </Link>
                   </Button>
                 </CardContent>
               </Card>
-            )}
-
-            <Card className="border-dashed flex flex-col items-center justify-center h-[350px]">
-              <CardContent className="flex flex-col items-center justify-center h-full py-6">
-                <div className="rounded-full bg-primary/10 p-3 mb-4">
-                  <Plus className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">Upload New Dataset</h3>
-                <p className="text-sm text-muted-foreground text-center mb-4">
-                  Share your data with the community and start earning
-                </p>
-                <Button asChild>
-                  <Link href="/dashboard/publish">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Dataset
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="purchased" className="space-y-4">
@@ -189,25 +238,31 @@ export function MyDatasets() {
         </TabsContent>
 
         <TabsContent value="drafts" className="space-y-4">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {draftDatasets.length > 0 ? (
-              draftDatasets
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {draftDatasets.length > 0 ? (
+                draftDatasets
                 .filter(
                   (dataset) =>
-                    dataset.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    dataset.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                      dataset.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      dataset.description?.toLowerCase().includes(searchQuery.toLowerCase())
                 )
                 .map((dataset) => (
-                  <DatasetCard key={dataset.id || dataset.tokenId} dataset={dataset} type="owned" />
-                ))
-            ) : (
-              <Card className="border-dashed col-span-3 flex flex-col items-center justify-center py-12">
-                <CardContent className="flex flex-col items-center justify-center h-full py-6">
-                  <p className="text-muted-foreground mb-4">No draft datasets found</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                    <DatasetCard key={dataset._id} dataset={dataset} type="owned" />
+                  ))
+              ) : (
+                <Card className="border-dashed col-span-3 flex flex-col items-center justify-center py-12">
+                  <CardContent className="flex flex-col items-center justify-center h-full py-6">
+                    <p className="text-muted-foreground mb-4">No draft datasets found</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
@@ -236,6 +291,11 @@ function DatasetCard({ dataset, type }: DatasetCardProps) {
     }
   };
 
+  // Use the dataset title or name based on what's available
+  const title = dataset.title || dataset.name || "Unnamed Dataset";
+  // Get the proper ID for links and keys
+  const datasetId = dataset._id || dataset.id || dataset.tokenId;
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="pb-2">
@@ -245,10 +305,10 @@ function DatasetCard({ dataset, type }: DatasetCardProps) {
           </Badge>
           <div className="flex items-center text-yellow-500">
             <Star className="h-3 w-3 fill-current" />
-            <span className="text-xs ml-1">{dataset.rating}</span>
+            <span className="text-xs ml-1">{dataset.rating || "4.5"}</span>
           </div>
         </div>
-        <CardTitle className="text-xl mt-2">{dataset.title || dataset.name}</CardTitle>
+        <CardTitle className="text-xl mt-2">{title}</CardTitle>
         {type === "purchased" && (
           <p className="text-xs text-muted-foreground">
             By <span className="text-primary">{dataset.owner}</span>
@@ -272,8 +332,10 @@ function DatasetCard({ dataset, type }: DatasetCardProps) {
         </div>
       </CardContent>
       <CardFooter className="flex justify-between border-t border-border/50 pt-4">
-        <Button size="sm" variant="outline">
-          View Details
+        <Button size="sm" variant="outline" asChild>
+          <Link href={`/dashboard/datasets/${datasetId}`}>
+            View Details
+          </Link>
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

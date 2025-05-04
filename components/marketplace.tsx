@@ -11,7 +11,7 @@ const datasets = [
   {
     title: "Global Climate Patterns",
     category: "Environmental",
-    price: "0.25 OCEAN",
+    price: "0.25 ETH",
     downloads: "2.3k",
     rating: 4.8,
     users: 156,
@@ -20,7 +20,7 @@ const datasets = [
   {
     title: "Consumer Behavior Analytics",
     category: "Market Research",
-    price: "0.75 OCEAN",
+    price: "0.75 ETH",
     downloads: "1.8k",
     rating: 4.6,
     users: 98,
@@ -29,7 +29,7 @@ const datasets = [
   {
     title: "Healthcare Outcomes",
     category: "Medical",
-    price: "1.2 OCEAN",
+    price: "1.2 ETH",
     downloads: "3.5k",
     rating: 4.9,
     users: 210,

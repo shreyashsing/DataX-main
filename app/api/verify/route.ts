@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import FormData from 'form-data';
 import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
     const name = formData.get('name') as string;
     const description = formData.get('description') as string || '';
     const isPrivate = formData.get('isPrivate') === 'true';
+    const draftId = formData.get('draftId') as string || null; // Get draft ID if available
     
     if (!file) {
       return NextResponse.json({ error: 'Missing file' }, { status: 400 });
@@ -53,29 +55,42 @@ export async function POST(req: NextRequest) {
       
       const verificationResult = verificationResponse.data;
       
-      // Store in MongoDB if available
-      try {
-        const { db } = await connectToDatabase();
-        
-        const dataset = {
-          name,
-          description,
-          owner: userId,
-          verified: verificationResult.isVerified,
-          verificationHash: verificationResult.verificationHash,
-          datasetHash: verificationResult.datasetHash,
-          qualityScore: verificationResult.qualityScore,
-          ipfsCid: verificationResult.details.datasetCID || 'ipfs://pending',
-          isPrivate,
-          createdAt: new Date(),
-          status: 'pending_mint',
-          analysisReport: verificationResult.details.analysisReport
-        };
-        
-        await db.collection('datasets').insertOne(dataset);
-      } catch (dbError) {
-        console.error('Database error:', dbError);
-        // Continue even if DB storage fails
+      // If a draft ID is provided, update the draft with verification results
+      let updatedDraft = null;
+      if (draftId) {
+        try {
+          const { db } = await connectToDatabase();
+          
+          // Update the draft with verification data
+          const result = await db.collection('datasets').updateOne(
+            { _id: new ObjectId(draftId), status: 'draft' },
+            { 
+              $set: {
+                verified: verificationResult.isVerified,
+                verificationHash: verificationResult.verificationHash,
+                datasetHash: verificationResult.datasetHash,
+                qualityScore: verificationResult.qualityScore,
+                ipfsCid: verificationResult.details.datasetCID || 'ipfs://pending',
+                verificationData: {
+                  missingValues: verificationResult.details.missingValues,
+                  anomaliesDetected: verificationResult.details.anomaliesDetected,
+                  biasScore: verificationResult.details.biasScore,
+                  piiDetected: verificationResult.details.piiDetected,
+                  overallQuality: verificationResult.qualityScore,
+                },
+                updatedAt: new Date()
+              }
+            }
+          );
+          
+          if (result.matchedCount > 0) {
+            // Get the updated draft
+            updatedDraft = await db.collection('datasets').findOne({ _id: new ObjectId(draftId) });
+          }
+        } catch (dbError) {
+          console.error('Database error:', dbError);
+          // Continue even if DB update fails
+        }
       }
       
       return NextResponse.json({
@@ -84,6 +99,8 @@ export async function POST(req: NextRequest) {
         verificationHash: verificationResult.verificationHash,
         datasetHash: verificationResult.datasetHash,
         qualityScore: verificationResult.qualityScore,
+        draftId: updatedDraft ? updatedDraft._id : draftId,
+        draft: updatedDraft,
         details: {
           missingValues: verificationResult.details.missingValues,
           anomaliesDetected: verificationResult.details.anomaliesDetected,
