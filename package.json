@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "init-db": "node scripts/init-db.js",
-    "seed-db": "cross-env FORCE_SEEDING=true node -e \"fetch('http://localhost:3000/api/seed-db').then(r => r.json()).then(console.log).catch(console.error)\""
+    "seed-db": "cross-env FORCE_SEEDING=true node -e \"fetch('http://localhost:3000/api/seed-db').then(r => r.json()).then(console.log).catch(console.error)\"",
+    "dev:full": "node -e \"console.log('Use the startup scripts in the root directory: ./start-dev.ps1 or ./start-dev.sh')\"",
+    "dev:local": "cross-env AI_VERIFICATION_API_URL=http://localhost:5000/api/verify RPC_URL=http://localhost:8545 npm run dev",
+    "dev:prod": "cross-env NODE_ENV=production npm run dev"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
@@ -70,11 +73,7 @@
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.54.1",
-    "react-icons": "^4.12.0",
-    "flowbite-react": "^0.7.2",
-    "react-hot-toast": "^2.4.1",
     "react-resizable-panels": "^2.1.7",
-    "slugify": "^1.6.6",
     "recharts": "2.15.0",
     "sonner": "^1.7.1",
     "stream-browserify": "^3.0.0",

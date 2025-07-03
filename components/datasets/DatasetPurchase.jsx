@@ -1,11 +1,9 @@
-"use client"
-
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { toast } from 'react-hot-toast';
 import { Button, Card, Spinner, Alert } from 'flowbite-react';
 import { purchaseDataTokens } from '@/lib/blockchain/tokenUtils';
-import { useAuth } from '@/components/auth/auth-provider';
+import { useAuth } from '@/hooks/useAuth';
 
 const DatasetPurchase = ({ dataset, onPurchaseComplete }) => {
   const { user } = useAuth();
